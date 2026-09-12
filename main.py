@@ -1,15 +1,13 @@
 import streamlit as st
-from urllib.parse import quote
 
 # =========================================================
 # 기본 설정
 # =========================================================
 
 st.set_page_config(
-    page_title="PetSOS",
+    page_title="PetSOS - 반려동물 응급처치",
     page_icon="🐾",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
 
 # =========================================================
@@ -23,729 +21,488 @@ st.markdown("""
     }
 
     .block-container {
-        max-width: 760px;
+        max-width: 700px;
         padding-top: 2rem;
-        padding-bottom: 4rem;
+        padding-bottom: 3rem;
+    }
+
+    h1, h2, h3 {
+        color: #17324D;
     }
 
     .app-title {
-        font-size: 2.4rem;
-        font-weight: 800;
-        color: #0F766E;
         text-align: center;
+        font-size: 2.3rem;
+        font-weight: 800;
+        color: #167D8D;
         margin-bottom: 0.2rem;
     }
 
-    .app-subtitle {
+    .subtitle {
         text-align: center;
         color: #64748B;
-        font-size: 1rem;
         margin-bottom: 2rem;
     }
 
-    .section-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #0F172A;
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .info-card {
+    .emergency-card {
         padding: 1.2rem;
-        border-radius: 16px;
+        border-radius: 18px;
+        margin: 0.5rem 0;
         background-color: white;
         border: 1px solid #E2E8F0;
-        margin-bottom: 1rem;
     }
 
-    .emergency-card {
-        padding: 1.3rem;
+    .urgent-box {
+        padding: 1.2rem;
         border-radius: 16px;
         margin: 1rem 0;
-        font-size: 1.05rem;
     }
 
-    .urgent-1 {
+    .level-1 {
         background-color: #ECFDF5;
         border-left: 6px solid #22C55E;
     }
 
-    .urgent-2 {
+    .level-2 {
         background-color: #FFF7ED;
         border-left: 6px solid #F97316;
     }
 
-    .urgent-3 {
+    .level-3 {
         background-color: #FEF2F2;
         border-left: 6px solid #DC2626;
     }
 
-    .warning-box {
-        background-color: #FFF7ED;
-        border-radius: 14px;
-        padding: 1rem;
-        border: 1px solid #FED7AA;
+    .action-box {
+        background-color: white;
+        border-radius: 16px;
+        padding: 1.2rem;
         margin: 1rem 0;
-    }
-
-    .danger-box {
-        background-color: #FEF2F2;
-        border-radius: 14px;
-        padding: 1rem;
-        border: 1px solid #FECACA;
-        margin: 1rem 0;
-    }
-
-    .success-box {
-        background-color: #F0FDFA;
-        border-radius: 14px;
-        padding: 1rem;
-        border: 1px solid #99F6E4;
-        margin: 1rem 0;
+        border: 1px solid #E2E8F0;
     }
 
     .small-text {
         color: #64748B;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
     }
 
     div.stButton > button {
-        border-radius: 12px;
+        width: 100%;
         min-height: 48px;
+        border-radius: 12px;
+        font-size: 1rem;
         font-weight: 600;
+    }
+
+    .progress {
+        text-align: center;
+        color: #64748B;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 # =========================================================
-# Session State
+# Session State 초기화
 # =========================================================
 
-if "page" not in st.session_state:
-    st.session_state.page = "pet"
+defaults = {
+    "page": "pet_info",
 
-if "pet" not in st.session_state:
-    st.session_state.pet = {}
+    "animal_type": "",
+    "weight": "",
+    "age": "",
+    "disease": "",
+    "medication": "",
+    "special_note": "",
 
-if "situation" not in st.session_state:
-    st.session_state.situation = None
+    "emergency_type": "",
+    "other_situation": "",
 
-if "other_situation" not in st.session_state:
-    st.session_state.other_situation = ""
+    "answers": {},
 
-if "answers" not in st.session_state:
-    st.session_state.answers = {}
+    "urgency_level": None,
 
-if "urgency" not in st.session_state:
-    st.session_state.urgency = None
-
-
-# =========================================================
-# 데이터
-# =========================================================
-
-SITUATIONS = {
-    "🩸": "출혈",
-    "😮": "호흡곤란",
-    "🧠": "발작 / 경련",
-    "☠️": "중독",
-    "🤮": "구토 / 설사",
-    "🔥": "화상",
-    "🌡️": "열사병 / 저체온",
-    "🦴": "외상 / 골절",
-    "🐝": "물림 / 벌레",
-    "👁️": "눈 이상",
+    "hospital_selected": None
 }
 
-# 데모용 질문
-QUESTIONS = {
-    "출혈": [
-        ("heavy", "출혈이 매우 많거나 빠르게 증가하고 있나요?"),
-        ("conscious", "반려동물이 의식이 있나요?"),
-        ("breathing", "정상적으로 호흡하고 있나요?"),
-        ("pale", "잇몸이나 혀가 창백하거나 푸른색인가요?"),
-        ("trauma", "큰 사고나 외상이 있었나요?"),
-    ],
-
-    "호흡곤란": [
-        ("breathing", "호흡이 매우 어렵거나 불규칙한가요?"),
-        ("conscious", "반려동물이 의식이 있나요?"),
-        ("blue", "잇몸이나 혀가 파랗거나 회색으로 보이나요?"),
-        ("collapse", "갑자기 쓰러졌거나 서 있기 어려운가요?"),
-    ],
-
-    "발작 / 경련": [
-        ("seizure_now", "현재 발작이나 경련이 계속되고 있나요?"),
-        ("conscious", "발작 후 의식이 돌아왔나요?"),
-        ("repeat", "짧은 시간 안에 반복적으로 발작했나요?"),
-        ("injury", "발작 중 다치거나 큰 외상이 발생했나요?"),
-    ],
-
-    "중독": [
-        ("known_toxin", "독성 물질이나 약물을 섭취했을 가능성이 있나요?"),
-        ("symptoms", "구토, 떨림, 침 흘림 등 이상 증상이 있나요?"),
-        ("conscious", "반려동물이 의식이 있나요?"),
-        ("breathing", "정상적으로 호흡하고 있나요?"),
-    ],
-
-    "구토 / 설사": [
-        ("blood", "토사물이나 대변에 피가 보이나요?"),
-        ("repeat", "구토나 설사가 반복되고 있나요?"),
-        ("conscious", "반려동물이 의식이 있고 반응하나요?"),
-        ("weak", "심하게 축 처지거나 서 있기 어려운가요?"),
-    ],
-
-    "화상": [
-        ("large", "화상 부위가 넓거나 심하게 손상되었나요?"),
-        ("face", "얼굴이나 입 주변에 화상이 있나요?"),
-        ("breathing", "호흡에 이상이 있나요?"),
-        ("conscious", "반려동물이 의식이 있나요?"),
-    ],
-
-    "열사병 / 저체온": [
-        ("conscious", "반려동물이 의식이 있나요?"),
-        ("breathing", "정상적으로 호흡하고 있나요?"),
-        ("collapse", "쓰러지거나 제대로 움직이지 못하나요?"),
-        ("severe", "심한 떨림, 혼란, 경련 등의 증상이 있나요?"),
-    ],
-
-    "외상 / 골절": [
-        ("bleeding", "심한 출혈이 있나요?"),
-        ("conscious", "반려동물이 의식이 있나요?"),
-        ("breathing", "정상적으로 호흡하고 있나요?"),
-        ("severe", "심한 통증이나 움직이지 못하는 상태인가요?"),
-    ],
-
-    "물림 / 벌레": [
-        ("breathing", "호흡에 이상이 있나요?"),
-        ("face", "얼굴이나 목이 빠르게 붓고 있나요?"),
-        ("collapse", "쓰러지거나 심하게 약해졌나요?"),
-        ("bleeding", "출혈이 심한가요?"),
-    ],
-
-    "눈 이상": [
-        ("injury", "눈에 심한 외상이나 이물질이 있나요?"),
-        ("vision", "갑자기 시야에 문제가 생긴 것처럼 보이나요?"),
-        ("pain", "눈을 심하게 감고 있거나 통증이 심해 보이나요?"),
-        ("blood", "눈 안이나 주변에 출혈이 있나요?"),
-    ]
-}
-
-
-FIRST_AID = {
-
-    "출혈": {
-        "do": [
-            "깨끗한 거즈나 천으로 출혈 부위를 부드럽게 압박하세요.",
-            "가능한 한 반려동물의 움직임을 줄이세요.",
-            "출혈이 시작된 시간과 상태 변화를 기억하세요."
-        ],
-        "dont": [
-            "상처에 임의로 약품을 바르지 마세요.",
-            "박힌 물체를 억지로 제거하지 마세요.",
-            "심한 출혈을 집에서 계속 관찰하며 병원 방문을 늦추지 마세요."
-        ],
-        "hospital": [
-            "출혈이 심하거나 계속되는 경우",
-            "의식이 떨어지는 경우",
-            "호흡에 이상이 있는 경우",
-            "잇몸이나 혀가 창백하거나 푸른 경우",
-            "큰 사고나 외상이 있었던 경우"
-        ]
-    },
-
-    "호흡곤란": {
-        "do": [
-            "반려동물을 최대한 안정시키고 움직임을 줄이세요.",
-            "기도를 막을 수 있는 물건이 없는지 안전한 범위에서 확인하세요.",
-            "즉시 동물병원에 연락할 준비를 하세요."
-        ],
-        "dont": [
-            "억지로 물이나 음식을 먹이지 마세요.",
-            "불필요하게 움직이거나 흥분시키지 마세요.",
-            "호흡곤란이 심한데 집에서 기다리지 마세요."
-        ],
-        "hospital": [
-            "호흡이 매우 어렵거나 불규칙한 경우",
-            "혀나 잇몸이 파랗거나 회색인 경우",
-            "의식을 잃거나 쓰러지는 경우"
-        ]
-    },
-
-    "발작 / 경련": {
-        "do": [
-            "주변의 위험한 물건을 치워 다치지 않도록 하세요.",
-            "발작이 시작된 시간을 확인하세요.",
-            "발작이 끝난 후 상태를 확인하고 병원에 연락하세요."
-        ],
-        "dont": [
-            "입 안에 손이나 물건을 넣지 마세요.",
-            "발작 중 억지로 움직임을 멈추려고 하지 마세요.",
-            "의식이 없는 상태에서 물이나 음식을 먹이지 마세요."
-        ],
-        "hospital": [
-            "발작이 계속되는 경우",
-            "짧은 시간 안에 반복되는 경우",
-            "발작 후 의식이 돌아오지 않는 경우",
-            "큰 외상이 발생한 경우"
-        ]
-    },
-
-    "중독": {
-        "do": [
-            "무엇을 먹었는지 가능하면 확인하세요.",
-            "섭취한 것으로 의심되는 물질과 시간을 기록하세요.",
-            "즉시 동물병원 또는 수의사에게 연락하세요."
-        ],
-        "dont": [
-            "수의사의 지시 없이 임의로 구토를 유도하지 마세요.",
-            "사람용 약이나 음식물을 임의로 먹이지 마세요.",
-            "증상이 없다는 이유로 장시간 기다리지 마세요."
-        ],
-        "hospital": [
-            "독성 물질 섭취가 의심되는 경우",
-            "구토, 떨림, 침 흘림 등의 증상이 나타나는 경우",
-            "의식이나 호흡에 이상이 있는 경우"
-        ]
-    },
-
-    "구토 / 설사": {
-        "do": [
-            "구토나 설사의 횟수와 시작 시간을 기록하세요.",
-            "토사물이나 대변의 상태를 확인하세요.",
-            "상태가 심하거나 반복되면 동물병원에 연락하세요."
-        ],
-        "dont": [
-            "사람용 약을 임의로 먹이지 마세요.",
-            "심한 증상이 있는데 장시간 집에서 관찰하지 마세요."
-        ],
-        "hospital": [
-            "피가 섞여 있는 경우",
-            "반복적인 구토나 설사가 지속되는 경우",
-            "심하게 축 처지는 경우",
-            "의식이나 호흡에 이상이 있는 경우"
-        ]
-    },
-
-    "화상": {
-        "do": [
-            "추가적인 열원에서 반려동물을 안전하게 이동시키세요.",
-            "가능하면 깨끗한 시원한 물로 해당 부위를 식혀주세요.",
-            "화상의 정도가 심하거나 넓다면 즉시 병원에 연락하세요."
-        ],
-        "dont": [
-            "얼음을 직접 대지 마세요.",
-            "화상 부위에 임의의 연고나 기름을 바르지 마세요.",
-            "물집이나 손상된 피부를 임의로 제거하지 마세요."
-        ],
-        "hospital": [
-            "화상 범위가 넓은 경우",
-            "얼굴이나 입 주변이 손상된 경우",
-            "호흡에 이상이 있는 경우",
-            "피부가 심하게 손상된 경우"
-        ]
-    },
-
-    "열사병 / 저체온": {
-        "do": [
-            "위험한 환경에서 반려동물을 안전한 장소로 이동시키세요.",
-            "상태를 확인하면서 즉시 동물병원에 연락하세요.",
-            "병원으로 이동할 준비를 하세요."
-        ],
-        "dont": [
-            "의식이 없는 동물에게 물을 억지로 먹이지 마세요.",
-            "갑작스럽고 극단적인 체온 변화를 유도하지 마세요.",
-            "심각한 증상을 집에서 장시간 관찰하지 마세요."
-        ],
-        "hospital": [
-            "의식이 떨어지는 경우",
-            "쓰러지는 경우",
-            "호흡 이상이 있는 경우",
-            "경련이나 심한 떨림이 있는 경우"
-        ]
-    },
-
-    "외상 / 골절": {
-        "do": [
-            "반려동물의 움직임을 최소화하세요.",
-            "추가적인 부상을 막을 수 있도록 안전하게 이동하세요.",
-            "심한 출혈이 있다면 가능한 범위에서 압박하세요."
-        ],
-        "dont": [
-            "골절이 의심되는 부위를 임의로 맞추지 마세요.",
-            "심한 통증이 있는 동물을 억지로 움직이지 마세요.",
-            "큰 사고 후 겉으로 괜찮아 보여도 장시간 기다리지 마세요."
-        ],
-        "hospital": [
-            "큰 사고나 추락이 있었던 경우",
-            "심한 출혈이 있는 경우",
-            "의식이나 호흡에 이상이 있는 경우",
-            "걷지 못하거나 심한 통증이 있는 경우"
-        ]
-    },
-
-    "물림 / 벌레": {
-        "do": [
-            "추가적인 공격이나 접촉을 피할 수 있는 안전한 장소로 이동하세요.",
-            "부종이나 증상의 변화를 관찰하세요.",
-            "증상이 심하거나 빠르게 진행되면 즉시 병원에 연락하세요."
-        ],
-        "dont": [
-            "상처를 강하게 문지르지 마세요.",
-            "사람용 약이나 연고를 임의로 사용하지 마세요."
-        ],
-        "hospital": [
-            "얼굴이나 목이 빠르게 붓는 경우",
-            "호흡에 이상이 있는 경우",
-            "쓰러지거나 심하게 약해지는 경우",
-            "심한 출혈이 있는 경우"
-        ]
-    },
-
-    "눈 이상": {
-        "do": [
-            "눈을 비비거나 긁지 못하게 해주세요.",
-            "추가적인 외상을 피하도록 안정시키세요.",
-            "통증이나 시력 이상이 의심되면 병원에 연락하세요."
-        ],
-        "dont": [
-            "눈에 박힌 물체를 억지로 제거하지 마세요.",
-            "사람용 안약을 임의로 사용하지 마세요.",
-            "심한 눈 손상을 집에서 장시간 관찰하지 마세요."
-        ],
-        "hospital": [
-            "심한 외상이 있는 경우",
-            "시력 이상이 갑자기 발생한 경우",
-            "심한 통증이 있는 경우",
-            "눈이나 주변에 출혈이 있는 경우"
-        ]
-    }
-}
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # =========================================================
-# 응급도 계산
+# 페이지 이동 함수
 # =========================================================
 
-def calculate_urgency(situation, answers):
-    """
-    데모용 단순 규칙.
-    실제 서비스에서는 수의학 전문가 검토 및 검증된 triage 기준이 필요함.
-    """
+def go_to(page):
+    st.session_state.page = page
+    st.rerun()
 
-    # 3단계로 바로 분류해야 하는 위험 신호
-    critical_keys = {
-        "출혈": ["heavy", "breathing", "pale"],
-        "호흡곤란": ["breathing", "blue", "conscious", "collapse"],
-        "발작 / 경련": ["seizure_now", "conscious", "repeat"],
-        "중독": ["conscious", "breathing"],
-        "구토 / 설사": ["blood", "weak"],
-        "화상": ["breathing", "conscious", "large"],
-        "열사병 / 저체온": ["conscious", "breathing", "collapse", "severe"],
-        "외상 / 골절": ["bleeding", "conscious", "breathing", "severe"],
-        "물림 / 벌레": ["breathing", "face", "collapse", "bleeding"],
-        "눈 이상": ["injury", "vision", "blood"],
-    }
 
-    # 예/아니오 질문에서 위험 신호에 해당하는 답변
-    for key in critical_keys.get(situation, []):
-        if key in answers and answers[key] == "예":
-            return 3
-
-    # 2단계 위험 신호
-    warning_keywords = {
-        "출혈": ["trauma"],
-        "호흡곤란": [],
-        "발작 / 경련": ["injury"],
-        "중독": ["known_toxin", "symptoms"],
-        "구토 / 설사": ["repeat"],
-        "화상": ["face"],
-        "열사병 / 저체온": [],
-        "외상 / 골절": ["severe"],
-        "물림 / 벌레": [],
-        "눈 이상": ["pain"],
-    }
-
-    for key in warning_keywords.get(situation, []):
-        if key in answers and answers[key] == "예":
-            return 2
-
-    return 1
+def back_to(page):
+    st.session_state.page = page
+    st.rerun()
 
 
 # =========================================================
-# 공통 UI
+# 공통 헤더
 # =========================================================
 
-def header():
-    st.markdown('<div class="app-title">🐾 PetSOS</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="app-subtitle">반려동물 응급상황 Quick Guide</div>',
-        unsafe_allow_html=True
-    )
+def page_header(title, subtitle=None, back_page=None):
 
+    if back_page:
+        if st.button("← 이전", key=f"back_{title}"):
+            back_to(back_page)
 
-def progress(current):
-    steps = ["반려동물 정보", "상황 선택", "상태 확인", "응급도", "응급처치", "병원"]
+    st.markdown(f"## {title}")
 
-    cols = st.columns(len(steps))
-
-    for i, step in enumerate(steps):
-        with cols[i]:
-            if i == current:
-                st.markdown(
-                    f"<div style='text-align:center;color:#0F766E;font-weight:700'>"
-                    f"●<br>{step}</div>",
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f"<div style='text-align:center;color:#CBD5E1'>"
-                    f"○<br><span style='font-size:0.7rem'>{step}</span></div>",
-                    unsafe_allow_html=True
-                )
+    if subtitle:
+        st.markdown(
+            f'<p class="small-text">{subtitle}</p>',
+            unsafe_allow_html=True
+        )
 
 
 # =========================================================
 # 1. 반려동물 정보
 # =========================================================
 
-def pet_page():
-
-    header()
-    progress(0)
+def pet_info_page():
 
     st.markdown(
-        '<div class="section-title">🐾 반려동물 정보를 알려주세요</div>',
+        '<div class="app-title">🐾 PetSOS</div>',
         unsafe_allow_html=True
     )
 
-    st.caption(
-        "응급상황에서 필요한 정보를 빠르게 확인하기 위한 기본 정보입니다."
+    st.markdown(
+        '<div class="subtitle">반려동물 응급상황 Quick Guide</div>',
+        unsafe_allow_html=True
     )
 
-    col1, col2 = st.columns(2)
+    st.markdown("### 먼저 반려동물의 정보를 알려주세요.")
+    st.caption("응급상황에 맞는 안내를 위해 최소한의 정보만 입력해주세요.")
 
-    with col1:
-        species = st.radio(
-            "동물 종류",
-            ["🐶 강아지", "🐱 고양이", "🐾 기타"],
-            horizontal=True
-        )
-
-    with col2:
-        weight = st.number_input(
-            "몸무게 (kg)",
-            min_value=0.0,
-            max_value=200.0,
-            value=5.0,
-            step=0.1
-        )
-
-    age = st.number_input(
-        "나이",
-        min_value=0,
-        max_value=40,
-        value=5
-    )
-
-    st.markdown("**기존 질환이나 특이사항이 있나요?**")
-
-    has_disease = st.radio(
-        "기저질환",
-        ["없음", "있음"],
+    animal = st.radio(
+        "🐾 반려동물 종류",
+        ["🐶 강아지", "🐱 고양이", "🐾 기타"],
         horizontal=True,
-        label_visibility="collapsed"
+        index=None
     )
 
-    disease = ""
+    weight = st.text_input(
+        "⚖️ 몸무게 (kg)",
+        value=st.session_state.weight,
+        placeholder="예: 8.5"
+    )
 
-    if has_disease == "있음":
+    age = st.text_input(
+        "🎂 나이",
+        value=st.session_state.age,
+        placeholder="예: 5살"
+    )
+
+    with st.expander("추가 정보 입력 (선택사항)"):
+
         disease = st.text_input(
-            "질환을 입력해주세요",
-            placeholder="예: 심장질환, 당뇨"
+            "기존 질환",
+            value=st.session_state.disease,
+            placeholder="예: 심장질환"
         )
 
-    medication = st.text_input(
-        "현재 복용 중인 약",
-        placeholder="없다면 비워두세요"
-    )
+        medication = st.text_input(
+            "복용 중인 약",
+            value=st.session_state.medication,
+            placeholder="복용 중인 약이 있다면 입력해주세요."
+        )
 
-    allergy = st.text_input(
-        "알레르기 / 기타 특이사항",
-        placeholder="없다면 비워두세요"
-    )
+        special_note = st.text_area(
+            "기타 특이사항",
+            value=st.session_state.special_note,
+            placeholder="알레르기 등 특이사항"
+        )
 
-    st.markdown("---")
+    if st.button("다음 →", type="primary"):
 
-    if st.button("다음 →", use_container_width=True, type="primary"):
+        if not animal:
+            st.warning("반려동물의 종류를 선택해주세요.")
+            return
 
-        st.session_state.pet = {
-            "species": species,
-            "weight": weight,
-            "age": age,
-            "disease": disease,
-            "medication": medication,
-            "allergy": allergy
-        }
+        st.session_state.animal_type = animal
+        st.session_state.weight = weight
+        st.session_state.age = age
+        st.session_state.disease = disease
+        st.session_state.medication = medication
+        st.session_state.special_note = special_note
 
-        st.session_state.page = "situation"
-        st.rerun()
-
-
-# =========================================================
-# 2. 상황 선택
-# =========================================================
-
-def situation_page():
-
-    header()
-    progress(1)
-
-    st.markdown(
-        '<div class="section-title">무슨 일이 일어났나요?</div>',
-        unsafe_allow_html=True
-    )
-
-    st.caption("현재 상황과 가장 가까운 항목을 선택해주세요.")
-
-    items = list(SITUATIONS.items())
-
-    for i in range(0, len(items), 2):
-
-        cols = st.columns(2)
-
-        for j in range(2):
-
-            if i + j < len(items):
-
-                icon, name = items[i + j]
-
-                with cols[j]:
-
-                    if st.button(
-                        f"{icon}\n\n{name}",
-                        key=f"situation_{name}",
-                        use_container_width=True
-                    ):
-
-                        st.session_state.situation = name
-
-                        if name == "기타":
-                            st.session_state.page = "other"
-                        else:
-                            st.session_state.page = "questions"
-
-                        st.rerun()
-
-    st.markdown("")
-
-    if st.button(
-        "❓ 기타 — 목록에 없는 상황",
-        use_container_width=True
-    ):
-        st.session_state.situation = "기타"
-        st.session_state.page = "other"
-        st.rerun()
+        go_to("emergency")
 
 
 # =========================================================
-# 3. 기타 상황
+# 2. 응급상황 선택
+# =========================================================
+
+def emergency_page():
+
+    page_header(
+        "무슨 일이 일어났나요?",
+        "현재 반려동물에게 발생한 상황을 선택해주세요.",
+        "pet_info"
+    )
+
+    emergencies = [
+        ("🩸", "출혈", "bleeding"),
+        ("😮", "호흡곤란", "breathing"),
+        ("🧠", "발작 / 경련", "seizure"),
+        ("☠️", "중독", "poisoning"),
+        ("🤮", "구토 / 설사", "vomiting"),
+        ("🔥", "화상", "burn"),
+        ("🦴", "외상 / 골절", "injury"),
+        ("🌡️", "열사병", "heatstroke"),
+        ("🐝", "물림 / 쏘임", "bite"),
+        ("❓", "기타", "other")
+    ]
+
+    cols = st.columns(2)
+
+    for i, (icon, name, code) in enumerate(emergencies):
+
+        with cols[i % 2]:
+
+            if st.button(
+                f"{icon}\n{name}",
+                key=f"emergency_{code}",
+                use_container_width=True
+            ):
+
+                st.session_state.emergency_type = code
+
+                if code == "other":
+                    go_to("other")
+
+                else:
+                    st.session_state.answers = {}
+                    go_to("questions")
+
+
+# =========================================================
+# 3. 기타 상황 입력
 # =========================================================
 
 def other_page():
 
-    header()
-    progress(1)
-
-    st.markdown(
-        '<div class="section-title">❓ 어떤 상황인가요?</div>',
-        unsafe_allow_html=True
+    page_header(
+        "❓ 기타 상황",
+        "현재 반려동물에게 어떤 일이 일어났는지 간단하게 적어주세요.",
+        "emergency"
     )
 
-    st.caption(
-        "반려동물에게 일어난 상황을 간단하게 적어주세요."
-    )
-
-    description = st.text_area(
-        "상황 설명",
+    situation = st.text_area(
+        "현재 상황",
+        value=st.session_state.other_situation,
         placeholder="예: 갑자기 쓰러졌어요.",
         height=150
     )
 
-    st.markdown(
-        """
-        <div class="warning-box">
-        ⚠️ 상황이 심각하거나 판단하기 어려운 경우에는
-        직접 응급처치를 시도하기보다 동물병원에 연락하세요.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    if st.button("계속하기 →", type="primary"):
 
-    if st.button(
-        "가까운 동물병원 찾기 →",
-        use_container_width=True,
-        type="primary"
-    ):
-        st.session_state.other_situation = description
-        st.session_state.urgency = 3
-        st.session_state.page = "hospital"
-        st.rerun()
+        if not situation.strip():
+            st.warning("현재 상황을 입력해주세요.")
+            return
+
+        st.session_state.other_situation = situation
+
+        # 기타 상황은 안전을 위해 바로 병원 상담 권고
+        st.session_state.urgency_level = 2
+
+        go_to("result")
 
 
 # =========================================================
-# 4. 상태 확인
+# 응급상황별 질문 데이터
+# =========================================================
+
+questions = {
+
+    "bleeding": [
+        ("heavy", "출혈이 심하거나 계속해서 많이 나오고 있나요?"),
+        ("conscious", "반려동물이 의식이 있나요?"),
+        ("breathing", "정상적으로 호흡하고 있나요?"),
+        ("pale_gums", "잇몸이나 혀가 창백하거나 푸른가요?")
+    ],
+
+    "breathing": [
+        ("breathing", "정상적으로 호흡하고 있나요?"),
+        ("conscious", "반려동물이 의식이 있나요?"),
+        ("blue_gums", "잇몸이나 혀가 파랗거나 보라색인가요?"),
+        ("collapse", "쓰러지거나 제대로 서지 못하나요?")
+    ],
+
+    "seizure": [
+        ("seizure_now", "현재 발작이나 경련이 계속되고 있나요?"),
+        ("conscious", "발작 후 의식이 돌아왔나요?"),
+        ("repeat", "짧은 시간 안에 발작이 반복되었나요?"),
+        ("breathing", "정상적으로 호흡하고 있나요?")
+    ],
+
+    "poisoning": [
+        ("known_poison", "독성 물질이나 약물을 먹었을 가능성이 있나요?"),
+        ("conscious", "반려동물이 의식이 있나요?"),
+        ("breathing", "정상적으로 호흡하고 있나요?"),
+        ("symptoms", "구토, 떨림, 경련 등의 증상이 있나요?")
+    ],
+
+    "vomiting": [
+        ("repeated", "구토나 설사가 반복되고 있나요?"),
+        ("blood", "피가 섞여 있나요?"),
+        ("conscious", "반려동물이 의식이 있나요?"),
+        ("weak", "심하게 처지거나 힘이 없어 보이나요?")
+    ],
+
+    "burn": [
+        ("large_burn", "화상 부위가 넓거나 심해 보이나요?"),
+        ("face", "얼굴이나 입 주변에 화상을 입었나요?"),
+        ("breathing", "정상적으로 호흡하고 있나요?"),
+        ("conscious", "반려동물이 의식이 있나요?")
+    ],
+
+    "injury": [
+        ("heavy_bleeding", "심한 출혈이 있나요?"),
+        ("cannot_stand", "일어서거나 걷지 못하나요?"),
+        ("conscious", "반려동물이 의식이 있나요?"),
+        ("breathing", "정상적으로 호흡하고 있나요?")
+    ],
+
+    "heatstroke": [
+        ("collapse", "쓰러졌거나 의식이 떨어졌나요?"),
+        ("breathing", "정상적으로 호흡하고 있나요?"),
+        ("heavy_panting", "심하게 헐떡이고 있나요?"),
+        ("vomiting", "구토나 설사가 있나요?")
+    ],
+
+    "bite": [
+        ("heavy_bleeding", "심한 출혈이 있나요?"),
+        ("face", "얼굴이나 목 주변을 물렸나요?"),
+        ("breathing", "정상적으로 호흡하고 있나요?"),
+        ("swelling", "얼굴이나 목이 빠르게 붓고 있나요?")
+    ]
+}
+
+
+# =========================================================
+# 4. 현재 상태 확인
 # =========================================================
 
 def questions_page():
 
-    header()
-    progress(2)
+    emergency_name = {
+        "bleeding": "🩸 출혈",
+        "breathing": "😮 호흡곤란",
+        "seizure": "🧠 발작 / 경련",
+        "poisoning": "☠️ 중독",
+        "vomiting": "🤮 구토 / 설사",
+        "burn": "🔥 화상",
+        "injury": "🦴 외상 / 골절",
+        "heatstroke": "🌡️ 열사병",
+        "bite": "🐝 물림 / 쏘임"
+    }
 
-    situation = st.session_state.situation
+    emergency = st.session_state.emergency_type
 
-    st.markdown(
-        f'<div class="section-title">{situation}</div>',
-        unsafe_allow_html=True
+    page_header(
+        f"{emergency_name.get(emergency, '응급상황')}",
+        "현재 반려동물의 상태를 확인해주세요.",
+        "emergency"
     )
 
-    st.caption(
-        "현재 상태를 확인해주세요. 정확히 모르겠다면 '모르겠어요'를 선택하세요."
-    )
+    qs = questions.get(emergency, [])
 
-    questions = QUESTIONS.get(situation, [])
-
-    for key, question in questions:
+    for key, question in qs:
 
         answer = st.radio(
             question,
             ["예", "아니오", "모르겠어요"],
             horizontal=True,
-            key=f"answer_{key}"
+            index=None,
+            key=f"question_{key}"
         )
 
-        st.session_state.answers[key] = answer
+        if answer:
+            st.session_state.answers[key] = answer
 
-        st.markdown("")
+    if st.button("응급도 확인하기 →", type="primary"):
 
-    if st.button(
-        "응급도 확인하기 →",
-        use_container_width=True,
-        type="primary"
-    ):
+        unanswered = [
+            key for key, _ in qs
+            if key not in st.session_state.answers
+        ]
 
-        urgency = calculate_urgency(
-            situation,
-            st.session_state.answers
-        )
+        if unanswered:
+            st.warning("모든 질문에 답해주세요.")
+            return
 
-        st.session_state.urgency = urgency
-        st.session_state.page = "result"
+        calculate_urgency()
+        go_to("result")
 
-        st.rerun()
+
+# =========================================================
+# 응급도 계산
+# =========================================================
+
+def calculate_urgency():
+
+    answers = st.session_state.answers
+    emergency = st.session_state.emergency_type
+
+    level = 1
+
+    # 명백한 위험 신호
+    emergency_signs = [
+        "heavy",
+        "pale_gums",
+        "blue_gums",
+        "collapse",
+        "seizure_now",
+        "heavy_bleeding",
+        "cannot_stand",
+        "large_burn"
+    ]
+
+    for sign in emergency_signs:
+        if answers.get(sign) == "예":
+            level = 3
+
+    # 호흡 관련 위험
+    if answers.get("breathing") == "아니오":
+        level = 3
+
+    # 의식 관련 위험
+    if answers.get("conscious") == "아니오":
+        level = 3
+
+    # 중간 정도 위험 신호
+    if level == 1:
+
+        medium_signs = [
+            "known_poison",
+            "symptoms",
+            "repeated",
+            "blood",
+            "weak",
+            "face",
+            "swelling",
+            "repeat",
+            "heavy_panting",
+            "vomiting"
+        ]
+
+        for sign in medium_signs:
+            if answers.get(sign) == "예":
+                level = 2
+
+    st.session_state.urgency_level = level
 
 
 # =========================================================
@@ -754,85 +511,177 @@ def questions_page():
 
 def result_page():
 
-    header()
-    progress(3)
+    level = st.session_state.urgency_level
 
-    urgency = st.session_state.urgency
-    situation = st.session_state.situation
+    page_header(
+        "응급도 확인 결과",
+        "현재 입력된 정보를 기준으로 확인한 결과입니다.",
+        "questions" if st.session_state.emergency_type != "other" else "other"
+    )
 
-    if urgency == 1:
+    if level == 1:
 
-        icon = "🟢"
-        title = "1단계 · 관찰"
-        message = (
-            "현재 확인된 위험 신호가 적습니다. "
-            "상태를 계속 관찰하고 이상이 지속되면 동물병원에 연락하세요."
-        )
-        css = "urgent-1"
+        st.markdown("""
+        <div class="urgent-box level-1">
+            <h2>🟢 1단계 · 관찰</h2>
+            <p><b>현재 확인된 위험 신호가 적습니다.</b></p>
+            <p>상태를 계속 관찰하고 이상이 지속되면 동물병원에 연락하세요.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    elif urgency == 2:
+    elif level == 2:
 
-        icon = "🟠"
-        title = "2단계 · 빠른 진료"
-        message = (
-            "가능한 한 빨리 동물병원에 연락하거나 방문하세요."
-        )
-        css = "urgent-2"
+        st.markdown("""
+        <div class="urgent-box level-2">
+            <h2>🟠 2단계 · 빠른 진료</h2>
+            <p><b>가능한 한 빨리 동물병원에 연락하거나 방문하세요.</b></p>
+        </div>
+        """, unsafe_allow_html=True)
 
     else:
 
-        icon = "🔴"
-        title = "3단계 · 응급"
-        message = (
-            "즉시 동물병원에 연락하고 응급진료를 받으세요."
-        )
-        css = "urgent-3"
-
-    st.markdown(
-        f"""
-        <div class="emergency-card {css}">
-            <div style="font-size:2.5rem">{icon}</div>
-            <h2>{title}</h2>
-            <p>{message}</p>
+        st.markdown("""
+        <div class="urgent-box level-3">
+            <h2>🔴 3단계 · 응급</h2>
+            <p><b>즉시 동물병원에 연락하고 응급진료를 받으세요.</b></p>
         </div>
-        """,
-        unsafe_allow_html=True
+        """, unsafe_allow_html=True)
+
+    st.markdown("### 확인된 정보")
+
+    st.write(
+        f"🐾 **종류:** {st.session_state.animal_type}"
     )
 
-    st.markdown("### 현재 상황")
-
-    st.info(
-        f"{situation}에 대한 위험 신호를 확인했습니다."
+    st.write(
+        f"⚖️ **체중:** {st.session_state.weight or '입력하지 않음'} kg"
     )
 
-    if urgency == 3:
+    st.write(
+        f"🎂 **나이:** {st.session_state.age or '입력하지 않음'}"
+    )
 
-        st.markdown(
-            """
-            <div class="danger-box">
-            🚨 <b>응급상황일 가능성이 있습니다.</b><br>
-            응급처치 안내를 확인하면서 가능한 한 빨리 동물병원에 연락하세요.
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    if st.session_state.emergency_type == "other":
 
-    if st.button(
-        "🚑 응급처치 확인하기",
-        use_container_width=True,
-        type="primary"
-    ):
-        st.session_state.page = "first_aid"
-        st.rerun()
+        st.markdown("### 현재 상황")
 
-    if urgency >= 2:
+        st.info(st.session_state.other_situation)
 
-        if st.button(
-            "🏥 바로 병원 찾기",
-            use_container_width=True
-        ):
-            st.session_state.page = "hospital"
-            st.rerun()
+    if st.button("🚑 응급처치 확인하기", type="primary"):
+        go_to("first_aid")
+
+    if st.button("🏥 바로 병원 찾기"):
+        go_to("hospitals")
+
+
+# =========================================================
+# 응급처치 데이터
+# =========================================================
+
+first_aid_data = {
+
+    "bleeding": {
+        "title": "🩸 출혈",
+        "do": [
+            "깨끗한 거즈나 천으로 출혈 부위를 압박하세요.",
+            "가능한 한 반려동물의 움직임을 줄이세요."
+        ],
+        "dont": [
+            "상처에 임의로 약품을 바르지 마세요.",
+            "박힌 물체를 억지로 제거하지 마세요."
+        ],
+        "hospital": [
+            "출혈이 심하거나 계속되는 경우",
+            "반려동물이 의식을 잃거나 심하게 약해지는 경우",
+            "잇몸이나 혀가 창백하거나 푸른 경우"
+        ]
+    },
+
+    "breathing": {
+        "title": "😮 호흡곤란",
+        "do": [
+            "반려동물을 최대한 안정시키고 움직임을 줄이세요.",
+            "호흡을 방해할 수 있는 요소가 있는지 확인하세요."
+        ],
+        "dont": [
+            "억지로 물이나 음식을 먹이지 마세요.",
+            "불필요하게 움직이거나 흥분시키지 마세요."
+        ],
+        "hospital": [
+            "호흡이 매우 어렵거나 멈추는 경우",
+            "잇몸이나 혀가 파랗거나 보라색인 경우",
+            "의식을 잃거나 쓰러지는 경우"
+        ]
+    },
+
+    "seizure": {
+        "title": "🧠 발작 / 경련",
+        "do": [
+            "주변의 위험한 물건을 치워주세요.",
+            "발작이 얼마나 지속되는지 시간을 확인하세요."
+        ],
+        "dont": [
+            "입 안에 손이나 물건을 넣지 마세요.",
+            "발작 중인 반려동물을 억지로 붙잡지 마세요."
+        ],
+        "hospital": [
+            "발작이 오래 지속되는 경우",
+            "발작이 반복되는 경우",
+            "발작 후 의식이 돌아오지 않는 경우"
+        ]
+    },
+
+    "poisoning": {
+        "title": "☠️ 중독",
+        "do": [
+            "무엇을 먹었는지 확인할 수 있다면 정보를 확보하세요.",
+            "가능한 한 빨리 동물병원에 연락하세요."
+        ],
+        "dont": [
+            "수의사의 지시 없이 구토를 유도하지 마세요.",
+            "임의로 약이나 음식을 먹이지 마세요."
+        ],
+        "hospital": [
+            "독성 물질을 먹었을 가능성이 있는 경우",
+            "경련이나 의식 저하가 있는 경우",
+            "호흡이 이상한 경우"
+        ]
+    },
+
+    "vomiting": {
+        "title": "🤮 구토 / 설사",
+        "do": [
+            "증상의 횟수와 상태를 기록하세요.",
+            "상태가 악화되는지 관찰하세요."
+        ],
+        "dont": [
+            "사람용 약을 임의로 먹이지 마세요.",
+            "상태가 심각한데 진료를 지연하지 마세요."
+        ],
+        "hospital": [
+            "피가 섞여 있는 경우",
+            "반복적으로 구토하거나 설사하는 경우",
+            "심하게 처지거나 의식이 이상한 경우"
+        ]
+    },
+
+    "burn": {
+        "title": "🔥 화상",
+        "do": [
+            "가능하면 화상 부위를 깨끗한 흐르는 물로 식혀주세요.",
+            "반려동물을 안정시키고 추가적인 손상을 막으세요."
+        ],
+        "dont": [
+            "얼음을 직접 대지 마세요.",
+            "화상 부위에 임의의 연고나 기름을 바르지 마세요."
+        ],
+        "hospital": [
+            "화상 범위가 넓은 경우",
+            "얼굴이나 입 주변에 화상이 있는 경우",
+            "호흡 이상이 있는 경우"
+        ]
+    }
+}
 
 
 # =========================================================
@@ -841,247 +690,310 @@ def result_page():
 
 def first_aid_page():
 
-    header()
-    progress(4)
+    emergency = st.session_state.emergency_type
 
-    situation = st.session_state.situation
-    data = FIRST_AID.get(situation)
-
-    st.markdown(
-        f'<div class="section-title">{situation} 응급처치</div>',
-        unsafe_allow_html=True
+    page_header(
+        "응급처치 안내",
+        "현재 상황에서 필요한 행동을 확인하세요.",
+        "result"
     )
 
+    data = first_aid_data.get(emergency)
+
     if not data:
+
         st.warning(
-            "현재 상황에 대한 상세 안내가 준비되지 않았습니다. "
-            "동물병원에 연락하세요."
+            "현재 상황에 대한 구체적인 응급처치 안내가 준비되지 않았습니다."
+        )
+
+        st.info(
+            "판단하기 어렵거나 상태가 심각하다면 가까운 동물병원에 연락하세요."
         )
 
     else:
 
-        st.markdown("### 🟢 지금 하세요")
+        st.markdown(f"## {data['title']}")
+
+        st.markdown("""
+        <div class="action-box">
+            <h3>✅ 지금 하세요</h3>
+        """, unsafe_allow_html=True)
 
         for item in data["do"]:
-            st.markdown(f"✅ **{item}**")
+            st.markdown(f"- **{item}**")
 
-        st.markdown("---")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("### 🔴 하지 마세요")
+        st.markdown("""
+        <div class="action-box">
+            <h3>❌ 하지 마세요</h3>
+        """, unsafe_allow_html=True)
 
         for item in data["dont"]:
-            st.markdown(f"❌ **{item}**")
+            st.markdown(f"- {item}")
 
-        st.markdown("---")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("### 🚨 바로 병원으로 가세요")
+        st.markdown("""
+        <div class="urgent-box level-3">
+            <h3>🚨 바로 병원으로 가야 하는 경우</h3>
+        """, unsafe_allow_html=True)
 
         for item in data["hospital"]:
-            st.markdown(f"🚨 {item}")
+            st.markdown(f"- **{item}**")
 
-    st.markdown("")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    if st.button(
-        "🏥 가까운 동물병원 찾기",
-        use_container_width=True,
-        type="primary"
-    ):
-        st.session_state.page = "hospital"
-        st.rerun()
+    if st.button("🏥 가까운 동물병원 찾기", type="primary"):
+        go_to("hospitals")
 
 
 # =========================================================
 # 7. 병원 찾기
 # =========================================================
 
-def hospital_page():
+def hospitals_page():
 
-    header()
-    progress(5)
-
-    st.markdown(
-        '<div class="section-title">🏥 가까운 동물병원</div>',
-        unsafe_allow_html=True
+    page_header(
+        "🏥 가까운 동물병원",
+        "현재 위치 주변의 동물병원을 확인하세요.",
+        "first_aid"
     )
 
-    st.caption(
-        "현재 위치 또는 지역을 기준으로 동물병원을 검색할 수 있습니다."
+    st.info(
+        "현재 버전에서는 예시 동물병원 정보를 보여줍니다. "
+        "실제 위치 기반 검색은 지도/병원 API를 연결하여 구현할 수 있습니다."
     )
 
-    region = st.text_input(
-        "지역 입력",
-        placeholder="예: 서울 강남구"
-    )
+    hospitals = [
+        {
+            "name": "서울동물병원",
+            "distance": "1.2 km",
+            "phone": "02-1234-5678",
+            "open": "현재 운영 정보 확인 필요"
+        },
+        {
+            "name": "우리동물메디컬센터",
+            "distance": "2.1 km",
+            "phone": "02-2345-6789",
+            "open": "현재 운영 정보 확인 필요"
+        },
+        {
+            "name": "24시 동물의료센터",
+            "distance": "3.4 km",
+            "phone": "02-3456-7890",
+            "open": "응급진료 여부 확인 필요"
+        }
+    ]
 
-    if region:
-
-        # 실제 병원 API를 붙이기 전 사용할 검색 링크
-        search_url = (
-            "https://www.google.com/maps/search/"
-            + quote(f"{region} 동물병원")
-        )
+    for hospital in hospitals:
 
         st.markdown(
             f"""
-            <div class="info-card">
-                <h3>📍 {region} 주변 동물병원</h3>
-                <p class="small-text">
-                    지도에서 주변 동물병원을 확인하세요.
-                </p>
+            <div class="action-box">
+                <h3>🏥 {hospital['name']}</h3>
+                <p>📍 거리: {hospital['distance']}</p>
+                <p>📞 {hospital['phone']}</p>
+                <p>🕐 {hospital['open']}</p>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-        st.link_button(
-            "🗺️ 주변 동물병원 지도에서 찾기",
-            search_url,
-            use_container_width=True
-        )
+        col1, col2 = st.columns(2)
 
-    st.markdown("---")
+        with col1:
 
-    if st.button(
-        "📋 병원에 전달할 정보 확인",
-        use_container_width=True,
-        type="primary"
-    ):
-        st.session_state.page = "contact"
-        st.rerun()
+            if st.button(
+                "📞 전화하기",
+                key=f"call_{hospital['name']}"
+            ):
+                st.info(
+                    f"전화번호: {hospital['phone']}"
+                )
+
+        with col2:
+
+            if st.button(
+                "📋 정보 전달",
+                key=f"send_{hospital['name']}"
+            ):
+
+                st.session_state.hospital_selected = hospital
+                go_to("hospital_info")
 
 
 # =========================================================
 # 8. 병원 전달 정보
 # =========================================================
 
-def contact_page():
+def hospital_info_page():
 
-    header()
-
-    st.markdown(
-        '<div class="section-title">📋 병원에 전달할 정보</div>',
-        unsafe_allow_html=True
+    page_header(
+        "📋 병원에 전달할 정보",
+        "병원에 연락하기 전에 정보를 확인해주세요.",
+        "hospitals"
     )
-
-    pet = st.session_state.pet
-    situation = st.session_state.situation
-
-    if situation == "기타":
-        situation_text = st.session_state.other_situation
-    else:
-        situation_text = situation
 
     st.markdown("### 🐾 반려동물")
 
-    st.markdown(
-        f"""
-        <div class="info-card">
-        <b>동물</b> : {pet.get("species", "-")}<br>
-        <b>나이</b> : {pet.get("age", "-")}세<br>
-        <b>체중</b> : {pet.get("weight", "-")} kg<br>
-        <b>기저질환</b> : {pet.get("disease") or "없음"}<br>
-        <b>복용약</b> : {pet.get("medication") or "없음"}<br>
-        <b>특이사항</b> : {pet.get("allergy") or "없음"}
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.write(
+        f"**종류:** {st.session_state.animal_type}"
     )
+
+    st.write(
+        f"**체중:** {st.session_state.weight or '입력하지 않음'} kg"
+    )
+
+    st.write(
+        f"**나이:** {st.session_state.age or '입력하지 않음'}"
+    )
+
+    if st.session_state.disease:
+        st.write(
+            f"**기존 질환:** {st.session_state.disease}"
+        )
+
+    if st.session_state.medication:
+        st.write(
+            f"**복용 중인 약:** {st.session_state.medication}"
+        )
 
     st.markdown("### 🚨 현재 상황")
 
-    st.markdown(
-        f"""
-        <div class="info-card">
-        <b>상황</b><br>
-        {situation_text}
-        </div>
-        """,
-        unsafe_allow_html=True
+    emergency_names = {
+        "bleeding": "출혈",
+        "breathing": "호흡곤란",
+        "seizure": "발작 / 경련",
+        "poisoning": "중독",
+        "vomiting": "구토 / 설사",
+        "burn": "화상",
+        "injury": "외상 / 골절",
+        "heatstroke": "열사병",
+        "bite": "물림 / 쏘임",
+        "other": "기타"
+    }
+
+    st.write(
+        f"**응급상황:** "
+        f"{emergency_names.get(st.session_state.emergency_type, '알 수 없음')}"
     )
 
-    if situation != "기타":
+    if st.session_state.other_situation:
+        st.write(
+            f"**상황 설명:** {st.session_state.other_situation}"
+        )
 
-        st.markdown("### 🔎 확인된 상태")
+    level_text = {
+        1: "🟢 1단계 - 관찰",
+        2: "🟠 2단계 - 빠른 진료",
+        3: "🔴 3단계 - 응급"
+    }
 
-        for key, answer in st.session_state.answers.items():
-
-            if answer == "예":
-
-                question = next(
-                    (
-                        q for k, q in QUESTIONS[situation]
-                        if k == key
-                    ),
-                    key
-                )
-
-                st.markdown(f"☑ {question}")
-
-    # 전화 전 전달용 텍스트
-    summary = f"""
-[PetSOS 응급상황 정보]
-
-반려동물
-- 동물: {pet.get("species", "-")}
-- 나이: {pet.get("age", "-")}세
-- 체중: {pet.get("weight", "-")} kg
-- 기저질환: {pet.get("disease") or "없음"}
-- 복용약: {pet.get("medication") or "없음"}
-- 특이사항: {pet.get("allergy") or "없음"}
-
-현재 상황
-- {situation_text}
-
-응급도
-- {st.session_state.urgency}단계
-"""
-
-    st.markdown("---")
+    st.write(
+        f"**현재 응급도:** "
+        f"{level_text.get(st.session_state.urgency_level, '확인 필요')}"
+    )
 
     st.markdown("### 📞 병원에 전달하기")
 
-    st.code(summary, language=None)
-
     st.caption(
-        "위 내용을 복사하여 병원에 전달하거나 전화할 때 참고할 수 있습니다."
+        "초기 버전에서는 실제 병원 시스템으로 정보가 직접 전송되지 않습니다."
     )
 
-    st.button(
-        "📋 정보 복사하기",
-        use_container_width=True
-    )
+    if st.button("📋 정보 복사하기"):
 
-    st.info(
-        "초기 버전에서는 실제 동물병원 시스템으로 정보를 직접 전송하지 않습니다."
-    )
+        text = f"""
+PetSOS 응급상황 정보
+
+반려동물
+- 종류: {st.session_state.animal_type}
+- 체중: {st.session_state.weight}
+- 나이: {st.session_state.age}
+
+응급상황
+- {emergency_names.get(st.session_state.emergency_type)}
+
+응급도
+- {level_text.get(st.session_state.urgency_level)}
+
+기존 질환
+- {st.session_state.disease or '없음'}
+
+복용 중인 약
+- {st.session_state.medication or '없음'}
+
+특이사항
+- {st.session_state.special_note or '없음'}
+"""
+
+        st.code(text)
+
+        st.success(
+            "위 정보를 복사하여 문자나 메신저 등으로 병원에 전달할 수 있습니다."
+        )
+
+    if st.session_state.hospital_selected:
+
+        hospital = st.session_state.hospital_selected
+
+        st.markdown(
+            f"### 🏥 {hospital['name']}"
+        )
+
+        st.write(
+            f"전화번호: {hospital['phone']}"
+        )
+
+        # 실제 전화 연결은 모바일 브라우저에서 tel: 링크 등을
+        # 사용하는 방식으로 확장 가능
+        st.markdown(
+            f"""
+            <a href="tel:{hospital['phone']}">
+                <button style="
+                    width:100%;
+                    height:50px;
+                    border:none;
+                    border-radius:12px;
+                    background:#167D8D;
+                    color:white;
+                    font-size:16px;
+                    font-weight:bold;
+                    cursor:pointer;">
+                    📞 병원에 전화하기
+                </button>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
 
 
 # =========================================================
-# 페이지 라우팅
+# 페이지 Router
 # =========================================================
 
-if st.session_state.page == "pet":
-    pet_page()
+page = st.session_state.page
 
-elif st.session_state.page == "situation":
-    situation_page()
+if page == "pet_info":
+    pet_info_page()
 
-elif st.session_state.page == "other":
+elif page == "emergency":
+    emergency_page()
+
+elif page == "other":
     other_page()
 
-elif st.session_state.page == "questions":
+elif page == "questions":
     questions_page()
 
-elif st.session_state.page == "result":
+elif page == "result":
     result_page()
 
-elif st.session_state.page == "first_aid":
+elif page == "first_aid":
     first_aid_page()
 
-elif st.session_state.page == "hospital":
-    hospital_page()
+elif page == "hospitals":
+    hospitals_page()
 
-elif st.session_state.page == "contact":
-    contact_page()
-
-
+elif page == "hospital_info":
+    hospital_info_page()
