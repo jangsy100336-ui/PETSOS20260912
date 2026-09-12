@@ -141,6 +141,10 @@ if "answers" not in st.session_state:
 if "urgency" not in st.session_state:
     st.session_state.urgency = None
 
+# 병원 찾기로 들어오기 직전 페이지 저장
+if "previous_page" not in st.session_state:
+    st.session_state.previous_page = None
+
 
 # =========================================================
 # 데이터
@@ -435,7 +439,6 @@ def calculate_urgency(situation, answers):
     실제 서비스에서는 수의학 전문가 검토 및 검증된 triage 기준이 필요함.
     """
 
-    # 3단계로 바로 분류해야 하는 위험 신호
     critical_keys = {
         "출혈": ["heavy", "breathing", "pale"],
         "호흡곤란": ["breathing", "blue", "conscious", "collapse"],
@@ -449,12 +452,10 @@ def calculate_urgency(situation, answers):
         "눈 이상": ["injury", "vision", "blood"],
     }
 
-    # 예/아니오 질문에서 위험 신호에 해당하는 답변
     for key in critical_keys.get(situation, []):
         if key in answers and answers[key] == "예":
             return 3
 
-    # 2단계 위험 신호
     warning_keywords = {
         "출혈": ["trauma"],
         "호흡곤란": [],
@@ -480,7 +481,11 @@ def calculate_urgency(situation, answers):
 # =========================================================
 
 def header():
-    st.markdown('<div class="app-title">🐾 PetSOS</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="app-title">🐾 PetSOS</div>',
+        unsafe_allow_html=True
+    )
+
     st.markdown(
         '<div class="app-subtitle">반려동물 응급상황 Quick Guide</div>',
         unsafe_allow_html=True
@@ -488,24 +493,70 @@ def header():
 
 
 def progress(current):
-    steps = ["반려동물 정보", "상황 선택", "상태 확인", "응급도", "응급처치", "병원"]
+    steps = [
+        "반려동물 정보",
+        "상황 선택",
+        "상태 확인",
+        "응급도",
+        "응급처치",
+        "병원"
+    ]
 
     cols = st.columns(len(steps))
 
     for i, step in enumerate(steps):
+
         with cols[i]:
+
             if i == current:
+
                 st.markdown(
-                    f"<div style='text-align:center;color:#0F766E;font-weight:700'>"
-                    f"●<br>{step}</div>",
+                    f"""
+                    <div style='text-align:center;
+                                color:#0F766E;
+                                font-weight:700'>
+                        ●<br>{step}
+                    </div>
+                    """,
                     unsafe_allow_html=True
                 )
+
             else:
+
                 st.markdown(
-                    f"<div style='text-align:center;color:#CBD5E1'>"
-                    f"○<br><span style='font-size:0.7rem'>{step}</span></div>",
+                    f"""
+                    <div style='text-align:center;
+                                color:#CBD5E1'>
+                        ○<br>
+                        <span style='font-size:0.7rem'>
+                            {step}
+                        </span>
+                    </div>
+                    """,
                     unsafe_allow_html=True
                 )
+
+
+# =========================================================
+# 페이지 이동 함수
+# =========================================================
+
+def go_back(page):
+    """
+    이전 페이지로 이동
+    """
+    st.session_state.page = page
+    st.rerun()
+
+
+def go_to_hospital(previous_page):
+    """
+    병원 찾기로 이동하면서
+    현재 페이지를 기억
+    """
+    st.session_state.previous_page = previous_page
+    st.session_state.page = "hospital"
+    st.rerun()
 
 
 # =========================================================
@@ -529,6 +580,7 @@ def pet_page():
     col1, col2 = st.columns(2)
 
     with col1:
+
         species = st.radio(
             "동물 종류",
             ["🐶 강아지", "🐱 고양이", "🐾 기타"],
@@ -536,6 +588,7 @@ def pet_page():
         )
 
     with col2:
+
         weight = st.number_input(
             "몸무게 (kg)",
             min_value=0.0,
@@ -563,6 +616,7 @@ def pet_page():
     disease = ""
 
     if has_disease == "있음":
+
         disease = st.text_input(
             "질환을 입력해주세요",
             placeholder="예: 심장질환, 당뇨"
@@ -580,7 +634,11 @@ def pet_page():
 
     st.markdown("---")
 
-    if st.button("다음 →", use_container_width=True, type="primary"):
+    if st.button(
+        "다음 →",
+        use_container_width=True,
+        type="primary"
+    ):
 
         st.session_state.pet = {
             "species": species,
@@ -609,7 +667,9 @@ def situation_page():
         unsafe_allow_html=True
     )
 
-    st.caption("현재 상황과 가장 가까운 항목을 선택해주세요.")
+    st.caption(
+        "현재 상황과 가장 가까운 항목을 선택해주세요."
+    )
 
     items = list(SITUATIONS.items())
 
@@ -632,12 +692,9 @@ def situation_page():
                     ):
 
                         st.session_state.situation = name
+                        st.session_state.answers = {}
 
-                        if name == "기타":
-                            st.session_state.page = "other"
-                        else:
-                            st.session_state.page = "questions"
-
+                        st.session_state.page = "questions"
                         st.rerun()
 
     st.markdown("")
@@ -646,9 +703,19 @@ def situation_page():
         "❓ 기타 — 목록에 없는 상황",
         use_container_width=True
     ):
+
         st.session_state.situation = "기타"
         st.session_state.page = "other"
         st.rerun()
+
+    st.markdown("---")
+
+    if st.button(
+        "← 이전으로",
+        use_container_width=True
+    ):
+
+        go_back("pet")
 
 
 # =========================================================
@@ -690,10 +757,20 @@ def other_page():
         use_container_width=True,
         type="primary"
     ):
+
         st.session_state.other_situation = description
         st.session_state.urgency = 3
-        st.session_state.page = "hospital"
-        st.rerun()
+
+        go_to_hospital("other")
+
+    st.markdown("")
+
+    if st.button(
+        "← 이전으로",
+        use_container_width=True
+    ):
+
+        go_back("situation")
 
 
 # =========================================================
@@ -747,6 +824,15 @@ def questions_page():
 
         st.rerun()
 
+    st.markdown("")
+
+    if st.button(
+        "← 이전으로",
+        use_container_width=True
+    ):
+
+        go_back("situation")
+
 
 # =========================================================
 # 5. 응급도 결과
@@ -764,28 +850,34 @@ def result_page():
 
         icon = "🟢"
         title = "1단계 · 관찰"
+
         message = (
             "현재 확인된 위험 신호가 적습니다. "
             "상태를 계속 관찰하고 이상이 지속되면 동물병원에 연락하세요."
         )
+
         css = "urgent-1"
 
     elif urgency == 2:
 
         icon = "🟠"
         title = "2단계 · 빠른 진료"
+
         message = (
             "가능한 한 빨리 동물병원에 연락하거나 방문하세요."
         )
+
         css = "urgent-2"
 
     else:
 
         icon = "🔴"
         title = "3단계 · 응급"
+
         message = (
             "즉시 동물병원에 연락하고 응급진료를 받으세요."
         )
+
         css = "urgent-3"
 
     st.markdown(
@@ -822,6 +914,7 @@ def result_page():
         use_container_width=True,
         type="primary"
     ):
+
         st.session_state.page = "first_aid"
         st.rerun()
 
@@ -831,8 +924,17 @@ def result_page():
             "🏥 바로 병원 찾기",
             use_container_width=True
         ):
-            st.session_state.page = "hospital"
-            st.rerun()
+
+            go_to_hospital("result")
+
+    st.markdown("")
+
+    if st.button(
+        "← 이전으로",
+        use_container_width=True
+    ):
+
+        go_back("questions")
 
 
 # =========================================================
@@ -853,6 +955,7 @@ def first_aid_page():
     )
 
     if not data:
+
         st.warning(
             "현재 상황에 대한 상세 안내가 준비되지 않았습니다. "
             "동물병원에 연락하세요."
@@ -886,8 +989,17 @@ def first_aid_page():
         use_container_width=True,
         type="primary"
     ):
-        st.session_state.page = "hospital"
-        st.rerun()
+
+        go_to_hospital("first_aid")
+
+    st.markdown("")
+
+    if st.button(
+        "← 이전으로",
+        use_container_width=True
+    ):
+
+        go_back("result")
 
 
 # =========================================================
@@ -915,7 +1027,6 @@ def hospital_page():
 
     if region:
 
-        # 실제 병원 API를 붙이기 전 사용할 검색 링크
         search_url = (
             "https://www.google.com/maps/search/"
             + quote(f"{region} 동물병원")
@@ -946,8 +1057,20 @@ def hospital_page():
         use_container_width=True,
         type="primary"
     ):
+
         st.session_state.page = "contact"
         st.rerun()
+
+    st.markdown("")
+
+    if st.button(
+        "← 이전으로",
+        use_container_width=True
+    ):
+
+        go_back(
+            st.session_state.previous_page or "result"
+        )
 
 
 # =========================================================
@@ -967,8 +1090,11 @@ def contact_page():
     situation = st.session_state.situation
 
     if situation == "기타":
+
         situation_text = st.session_state.other_situation
+
     else:
+
         situation_text = situation
 
     st.markdown("### 🐾 반려동물")
@@ -1009,13 +1135,16 @@ def contact_page():
 
                 question = next(
                     (
-                        q for k, q in QUESTIONS[situation]
+                        q
+                        for k, q in QUESTIONS[situation]
                         if k == key
                     ),
                     key
                 )
 
-                st.markdown(f"☑ {question}")
+                st.markdown(
+                    f"☑ {question}"
+                )
 
     # 전화 전 전달용 텍스트
     summary = f"""
@@ -1040,7 +1169,10 @@ def contact_page():
 
     st.markdown("### 📞 병원에 전달하기")
 
-    st.code(summary, language=None)
+    st.code(
+        summary,
+        language=None
+    )
 
     st.caption(
         "위 내용을 복사하여 병원에 전달하거나 전화할 때 참고할 수 있습니다."
@@ -1055,31 +1187,49 @@ def contact_page():
         "초기 버전에서는 실제 동물병원 시스템으로 정보를 직접 전송하지 않습니다."
     )
 
+    st.markdown("---")
+
+    # ⭐ 요청한 기능
+    if st.button(
+        "← 병원 찾기로 돌아가기",
+        use_container_width=True
+    ):
+
+        go_back("hospital")
+
 
 # =========================================================
 # 페이지 라우팅
 # =========================================================
 
 if st.session_state.page == "pet":
+
     pet_page()
 
 elif st.session_state.page == "situation":
+
     situation_page()
 
 elif st.session_state.page == "other":
+
     other_page()
 
 elif st.session_state.page == "questions":
+
     questions_page()
 
 elif st.session_state.page == "result":
+
     result_page()
 
 elif st.session_state.page == "first_aid":
+
     first_aid_page()
 
 elif st.session_state.page == "hospital":
+
     hospital_page()
 
 elif st.session_state.page == "contact":
+
     contact_page()
